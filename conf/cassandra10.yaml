@@ -574,7 +574,7 @@ rpc_port: 9160
 # be set to 0.0.0.0. If left blank, this will be set to the value of
 # rpc_address. If rpc_address is set to 0.0.0.0, broadcast_rpc_address must
 # be set.
-# broadcast_rpc_address: 1.2.3.4
+broadcast_rpc_address: 172.22.153.106
 
 # enable or disable keepalive on rpc/native connections
 rpc_keepalive: true
