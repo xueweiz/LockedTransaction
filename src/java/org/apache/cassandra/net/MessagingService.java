@@ -104,6 +104,9 @@ public final class MessagingService implements MessagingServiceMBean
     /* All verb handler identifiers */
     public enum Verb
     {
+        //add
+        LOCK,
+        //add
         MUTATION,
         HINT,
         READ_REPAIR,
@@ -162,7 +165,9 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.PAXOS_COMMIT, Stage.MUTATION);
         put(Verb.BATCH_STORE, Stage.MUTATION);
         put(Verb.BATCH_REMOVE, Stage.MUTATION);
-
+        //add
+        put(Verb.LOCK,Stage.MUTATION);
+        //add
         put(Verb.READ, Stage.READ);
         put(Verb.RANGE_SLICE, Stage.READ);
         put(Verb.INDEX_SCAN, Stage.READ);
@@ -212,7 +217,9 @@ public final class MessagingService implements MessagingServiceMBean
     {{
         put(Verb.REQUEST_RESPONSE, CallbackDeterminedSerializer.instance);
         put(Verb.INTERNAL_RESPONSE, CallbackDeterminedSerializer.instance);
-
+        //add
+        put(Verb.LOCK,Mutation.serializer);
+        //add
         put(Verb.MUTATION, Mutation.serializer);
         put(Verb.READ_REPAIR, Mutation.serializer);
         put(Verb.READ, ReadCommand.serializer);
@@ -242,6 +249,9 @@ public final class MessagingService implements MessagingServiceMBean
      */
     public static final EnumMap<Verb, IVersionedSerializer<?>> callbackDeserializers = new EnumMap<Verb, IVersionedSerializer<?>>(Verb.class)
     {{
+      //add
+        put(Verb.LOCK, WriteResponse.serializer);
+      //add
         put(Verb.MUTATION, WriteResponse.serializer);
         put(Verb.HINT, HintResponse.serializer);
         put(Verb.READ_REPAIR, WriteResponse.serializer);
@@ -308,6 +318,9 @@ public final class MessagingService implements MessagingServiceMBean
      * drop internal messages like bootstrap or repair notifications.
      */
     public static final EnumSet<Verb> DROPPABLE_VERBS = EnumSet.of(Verb._TRACE,
+            //add
+                                                                   Verb.LOCK,
+            //add
                                                                    Verb.MUTATION,
                                                                    Verb.COUNTER_MUTATION,
                                                                    Verb.HINT,
@@ -651,6 +664,7 @@ public final class MessagingService implements MessagingServiceMBean
                            boolean allowHints)
     {
         assert message.verb == Verb.MUTATION
+           /*add*/     || message.verb == Verb.LOCK
             || message.verb == Verb.COUNTER_MUTATION
             || message.verb == Verb.PAXOS_COMMIT;
         int messageId = nextId();

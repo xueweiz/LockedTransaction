@@ -321,6 +321,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
         /* register the verb handlers */
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.MUTATION, new MutationVerbHandler());
+        /*add*/
+        MessagingService.instance().registerVerbHandlers(MessagingService.Verb.LOCK, new MutationVerbHandler());
+        
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.READ_REPAIR, new ReadRepairVerbHandler());
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.READ, new ReadCommandVerbHandler());
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.RANGE_SLICE, new RangeSliceVerbHandler());

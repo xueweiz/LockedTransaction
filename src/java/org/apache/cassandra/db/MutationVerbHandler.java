@@ -26,6 +26,7 @@ import org.apache.cassandra.batchlog.LegacyBatchlogMigrator;
 import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.io.util.FastByteArrayInputStream;
 import org.apache.cassandra.net.*;
+import org.apache.cassandra.net.MessagingService.Verb;
 import org.apache.cassandra.tracing.Tracing;
 
 public class MutationVerbHandler implements IVerbHandler<Mutation>
@@ -43,6 +44,7 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
 
     public void doVerb(MessageIn<Mutation> message, int id)  throws IOException
     {
+        //if(message.verb==Verb.LOCK)
         // Check if there were any forwarding headers in this message
         byte[] from = message.parameters.get(Mutation.FORWARD_FROM);
         InetAddress replyTo;
