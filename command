@@ -3,6 +3,7 @@ ps auwx | grep cassandra
 sudo kill -9 PID
 
 cd LockedTransaction
+git stash
 git pull
 
 #first cluster
