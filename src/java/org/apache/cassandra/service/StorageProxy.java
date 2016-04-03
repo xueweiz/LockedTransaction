@@ -1357,6 +1357,8 @@ public class StorageProxy implements StorageProxyMBean
                 }
             }
         }
+        if (insertLocal)
+            performLocallyLock(stage, Optional.of(mutation), mutation::apply, responseHandler);
 
         if (dcGroups != null) {
             // for each datacenter, send the message to one node to relay the
@@ -1453,6 +1455,39 @@ public class StorageProxy implements StorageProxyMBean
         });
     }
 
+/*add */
+
+    
+    private static void performLocallyLock(Stage stage, Optional<IMutation> mutation, final Runnable runnable, final IAsyncCallbackWithFailure<?> handler)
+    {
+        StageManager.getStage(stage).maybeExecuteImmediately(new LocalMutationRunnable(mutation)
+        {
+            public void runMayThrow()
+            {
+                try
+                {
+                    handler.response(null);
+                }
+                catch (Exception ex)
+                {
+                    if (!(ex instanceof WriteTimeoutException))
+                        logger.error("Failed to apply mutation locally : {}", ex);
+                    handler.onFailure(FBUtilities.getBroadcastAddress());
+                }
+            }
+
+            @Override
+            protected Verb verb()
+            {
+                return MessagingService.Verb.MUTATION;
+            }
+        });
+    }
+    
+    /*add*/
+
+    
+    
     private static void performLocally(Stage stage, Optional<IMutation> mutation, final Runnable runnable, final IAsyncCallbackWithFailure<?> handler)
     {
         StageManager.getStage(stage).maybeExecuteImmediately(new LocalMutationRunnable(mutation)
