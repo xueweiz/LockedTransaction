@@ -71,6 +71,7 @@ import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.triggers.TriggerExecutor;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.AbstractIterator;
+import org.apache.cassandra.net.MessageOut;
 
 import static com.google.common.collect.Iterables.contains;
 
@@ -810,12 +811,53 @@ public class StorageProxy implements StorageProxyMBean
         }
     }
 
+    /*add*/
+    public static void lock(IMutation mutation)
+    {
+        MessageOut<Mutation> message = null;
+        message = ((Mutation)mutation).createMessage(Verb.LOCK);
+        
+        String keyspaceName = mutation.getKeyspaceName();
+        AbstractReplicationStrategy rs = Keyspace.open(keyspaceName).getReplicationStrategy();
+
+        Token tk = mutation.key().getToken();
+        List<InetAddress> naturalEndpoints = StorageService.instance.getNaturalEndpoints(keyspaceName, tk);
+        Collection<InetAddress> pendingEndpoints = StorageService.instance.getTokenMetadata().pendingEndpointsFor(tk, keyspaceName);
+
+        
+        Iterable<InetAddress> targets = Iterables.concat(naturalEndpoints, pendingEndpoints);
+        
+        
+        for (InetAddress destination : targets)
+        {
+            checkHintOverload(destination);
+
+            if (FailureDetector.instance.isAlive(destination))
+            {
+
+
+                        MessagingService.instance().sendRR(message, destination, null, true);
+            }
+        }
+        
+        
+        
+    }
+    /*add*/
+    
+    
     @SuppressWarnings("unchecked")
     public static void mutateWithTriggers(Collection<? extends IMutation> mutations,
                                           ConsistencyLevel consistencyLevel,
                                           boolean mutateAtomically)
     throws WriteTimeoutException, WriteFailureException, UnavailableException, OverloadedException, InvalidRequestException
     {
+        /*add
+        for(IMutation mutation:mutations)
+        {
+            lock(mutation);
+        }
+        /*add*/
         Collection<Mutation> augmented = TriggerExecutor.instance.execute(mutations);
 
         boolean updatesView = Keyspace.open(mutations.iterator().next().getKeyspaceName())
@@ -1206,7 +1248,7 @@ public class StorageProxy implements StorageProxyMBean
                 {
                     // belongs on a different server
                     if (message == null)
-                        message = mutation.createMessage();
+                        message = mutation.createMessage(Verb.LOCK);//add
                     String dc = DatabaseDescriptor.getEndpointSnitch().getDatacenter(destination);
                     // direct writes to local DC or old Cassandra versions
                     // (1.1 knows how to forward old-style String message IDs; updated to int in 2.0)

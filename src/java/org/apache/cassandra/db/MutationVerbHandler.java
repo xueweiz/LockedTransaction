@@ -44,7 +44,14 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
 
     public void doVerb(MessageIn<Mutation> message, int id)  throws IOException
     {
-        //if(message.verb==Verb.LOCK)
+        /*add*/
+        if(message.verb==Verb.LOCK)
+        {
+            
+        }
+        
+        /*add*/
+        
         // Check if there were any forwarding headers in this message
         byte[] from = message.parameters.get(Mutation.FORWARD_FROM);
         InetAddress replyTo;

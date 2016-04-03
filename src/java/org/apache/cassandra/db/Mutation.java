@@ -232,7 +232,6 @@ public class Mutation implements IMutation
     {
         apply(false);
     }
-
     public MessageOut<Mutation> createMessage()
     {
         return createMessage(MessagingService.Verb.MUTATION);
