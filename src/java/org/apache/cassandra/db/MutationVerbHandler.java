@@ -41,13 +41,49 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     {
         Tracing.trace("Payload application resulted in WriteTimeout, not replying");
     }
+    /*add*/
 
+    public void doVerbLock(MessageIn<Mutation> message, int id)  throws IOException
+    {
+        replyLock(message, id);
+    }
+    
+    public void replyLock(MessageIn<Mutation> message, int id)  throws IOException
+    {
+        // Check if there were any forwarding headers in this message
+        byte[] from = message.parameters.get(Mutation.FORWARD_FROM);
+        InetAddress replyTo;
+        if (from == null)
+        {
+            replyTo = message.from;
+            byte[] forwardBytes = message.parameters.get(Mutation.FORWARD_TO);
+            if (forwardBytes != null)
+                forwardToLocalNodes(message.payload, message.verb, forwardBytes, message.from);
+        }
+        else
+        {
+            replyTo = InetAddress.getByAddress(from);
+        }
+
+        try
+        {
+                reply(id, replyTo);
+        }
+        catch (WriteTimeoutException wto)
+        {
+            failed();
+        }
+    }
+    /*add*/
+
+    
     public void doVerb(MessageIn<Mutation> message, int id)  throws IOException
     {
         /*add*/
         if(message.verb==Verb.LOCK)
         {
-            
+            doVerbLock(message, id);
+            return;
         }
         
         /*add*/

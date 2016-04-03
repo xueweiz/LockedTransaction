@@ -83,6 +83,8 @@ public class StorageProxy implements StorageProxyMBean
     public static final String UNREACHABLE = "UNREACHABLE";
 
     private static final WritePerformer standardWritePerformer;
+    private static final WritePerformer lockPerformer;
+    
     private static final WritePerformer counterWritePerformer;
     private static final WritePerformer counterWriteOnCoordinatorPerformer;
 
@@ -137,7 +139,27 @@ public class StorageProxy implements StorageProxyMBean
                 sendToHintedEndpoints((Mutation) mutation, targets, responseHandler, localDataCenter, Stage.MUTATION);
             }
         };
-
+        
+        /*add*/
+        lockPerformer = new WritePerformer()
+        {
+            public void apply(IMutation mutation,
+                              Iterable<InetAddress> targets,
+                              AbstractWriteResponseHandler<IMutation> responseHandler,
+                              String localDataCenter,
+                              ConsistencyLevel consistency_level)
+            throws OverloadedException
+            {
+                assert mutation instanceof Mutation;
+                sendToHintedEndpointsLock((Mutation) mutation, targets, responseHandler, localDataCenter, Stage.MUTATION);
+            }
+        };
+        
+        /*add*/
+        
+        
+        
+        
         /*
          * We execute counter writes in 2 places: either directly in the coordinator node if it is a replica, or
          * in CounterMutationVerbHandler on a replica othewise. The write must be executed on the COUNTER_MUTATION stage
@@ -812,37 +834,34 @@ public class StorageProxy implements StorageProxyMBean
     }
 
     /*add*/
-    public static void lock(IMutation mutation)
-    {
-        MessageOut<Mutation> message = null;
-        message = ((Mutation)mutation).createMessage(Verb.LOCK);
-        
-        String keyspaceName = mutation.getKeyspaceName();
-        AbstractReplicationStrategy rs = Keyspace.open(keyspaceName).getReplicationStrategy();
+    public static void lock(Collection<? extends IMutation> mutations)
+    {        
+        Tracing.trace("Determining replicas for mutation");
+        final String localDataCenter = DatabaseDescriptor.getEndpointSnitch().getDatacenter(FBUtilities.getBroadcastAddress());
 
-        Token tk = mutation.key().getToken();
-        List<InetAddress> naturalEndpoints = StorageService.instance.getNaturalEndpoints(keyspaceName, tk);
-        Collection<InetAddress> pendingEndpoints = StorageService.instance.getTokenMetadata().pendingEndpointsFor(tk, keyspaceName);
-
-        
-        Iterable<InetAddress> targets = Iterables.concat(naturalEndpoints, pendingEndpoints);
-        
-        
-        for (InetAddress destination : targets)
+//        long startTime = System.nanoTime();
+        List<AbstractWriteResponseHandler<IMutation>> responseHandlers = new ArrayList<>(mutations.size());
+        for (IMutation mutation : mutations)
         {
-            checkHintOverload(destination);
-
-            if (FailureDetector.instance.isAlive(destination))
+            if (mutation instanceof CounterMutation)
             {
-
-
-                        MessagingService.instance().sendRR(message, destination, null, true);
+                responseHandlers.add(mutateCounter((CounterMutation)mutation, localDataCenter));
+            }
+            else
+            {
+                WriteType wt = mutations.size() <= 1 ? WriteType.SIMPLE : WriteType.UNLOGGED_BATCH;
+                responseHandlers.add(performWrite(mutation, ConsistencyLevel.ALL, localDataCenter, lockPerformer, null, wt));
             }
         }
+
+        // wait for writes.  throws TimeoutException if necessary
+        for (AbstractWriteResponseHandler<IMutation> responseHandler : responseHandlers)
+        {
+            responseHandler.getLongWait();
+        }
         
-        
-        
-    }
+     
+}
     /*add*/
     
     
@@ -852,11 +871,8 @@ public class StorageProxy implements StorageProxyMBean
                                           boolean mutateAtomically)
     throws WriteTimeoutException, WriteFailureException, UnavailableException, OverloadedException, InvalidRequestException
     {
-        /*add
-        for(IMutation mutation:mutations)
-        {
-            lock(mutation);
-        }
+        /*add*/
+        lock(mutations);
         /*add*/
         Collection<Mutation> augmented = TriggerExecutor.instance.execute(mutations);
 
@@ -1248,7 +1264,7 @@ public class StorageProxy implements StorageProxyMBean
                 {
                     // belongs on a different server
                     if (message == null)
-                        message = mutation.createMessage(Verb.LOCK);//add
+                        message = mutation.createMessage();
                     String dc = DatabaseDescriptor.getEndpointSnitch().getDatacenter(destination);
                     // direct writes to local DC or old Cassandra versions
                     // (1.1 knows how to forward old-style String message IDs; updated to int in 2.0)
@@ -1298,6 +1314,69 @@ public class StorageProxy implements StorageProxyMBean
         }
     }
 
+    
+    /* add */
+    public static void sendToHintedEndpointsLock(final Mutation mutation, Iterable<InetAddress> targets,
+            AbstractWriteResponseHandler<IMutation> responseHandler, String localDataCenter, Stage stage)
+                    throws OverloadedException {
+        // extra-datacenter replicas, grouped by dc
+        Map<String, Collection<InetAddress>> dcGroups = null;
+        // only need to create a Message for non-local writes
+        MessageOut<Mutation> message = null;
+
+        boolean insertLocal = false;
+        ArrayList<InetAddress> endpointsToHint = null;
+
+        for (InetAddress destination : targets) {
+            checkHintOverload(destination);
+
+            if (FailureDetector.instance.isAlive(destination)) {
+                if (canDoLocalRequest(destination)) {
+                    insertLocal = true;
+                } else {
+                    // belongs on a different server
+                    if (message == null)
+                        message = mutation.createMessage(Verb.LOCK);
+                    String dc = DatabaseDescriptor.getEndpointSnitch().getDatacenter(destination);
+                    // direct writes to local DC or old Cassandra versions
+                    // (1.1 knows how to forward old-style String message IDs;
+                    // updated to int in 2.0)
+                    if (localDataCenter.equals(dc)) {
+                        MessagingService.instance().sendRR(message, destination, responseHandler, true);
+                    } else {
+                        Collection<InetAddress> messages = (dcGroups != null) ? dcGroups.get(dc) : null;
+                        if (messages == null) {
+                            messages = new ArrayList<>(3); // most DCs will have
+                                                           // <= 3 replicas
+                            if (dcGroups == null)
+                                dcGroups = new HashMap<>();
+                            dcGroups.put(dc, messages);
+                        }
+                        messages.add(destination);
+                    }
+                }
+            }
+        }
+
+        if (dcGroups != null) {
+            // for each datacenter, send the message to one node to relay the
+            // write to other replicas
+            if (message == null)
+                message = mutation.createMessage();
+
+            for (Collection<InetAddress> dcTargets : dcGroups.values())
+                sendMessagesToNonlocalDC(message, dcTargets, responseHandler);
+        }
+    }
+    /*add*/
+    
+    
+    
+    
+    
+    
+    
+    
     private static void checkHintOverload(InetAddress destination)
     {
         // avoid OOMing due to excess hints.  we need to do this check even for "live" nodes, since we can

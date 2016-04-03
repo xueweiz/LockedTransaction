@@ -107,6 +107,46 @@ public abstract class AbstractWriteResponseHandler<T> implements IAsyncCallbackW
         }
     }
 
+    
+    /*add*/
+    public void getLongWait() throws WriteTimeoutException, WriteFailureException
+    {
+        long requestTimeout = 1000000;
+
+        long timeout = requestTimeout - (System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(start));
+
+        boolean success;
+        try
+        {
+            success = condition.await(timeout, TimeUnit.MILLISECONDS);
+        }
+        catch (InterruptedException ex)
+        {
+            throw new AssertionError(ex);
+        }
+
+        if (!success)
+        {
+            int blockedFor = totalBlockFor();
+            int acks = ackCount();
+            // It's pretty unlikely, but we can race between exiting await above and here, so
+            // that we could now have enough acks. In that case, we "lie" on the acks count to
+            // avoid sending confusing info to the user (see CASSANDRA-6491).
+            if (acks >= blockedFor)
+                acks = blockedFor - 1;
+            throw new WriteTimeoutException(writeType, consistencyLevel, acks, blockedFor);
+        }
+
+        if (totalBlockFor() + failures > totalEndpoints())
+        {
+            throw new WriteFailureException(consistencyLevel, ackCount(), failures, totalBlockFor(), writeType);
+        }
+    }
+    /*add*/
+    
+    
+    
+    
     /** 
      * @return the minimum number of endpoints that must reply. 
      */
