@@ -10,7 +10,7 @@ commitlog_sync_batch_window_in_ms: 1.0
 commitlog_segment_size_in_mb: 5
 commitlog_directory: build/test/cassandra/commitlog
 hints_directory: build/test/cassandra/hints
-partitioner: org.apache.cassandra.dht.Murmur3Partitioner
+partitioner: org.apache.cassandra.dht.ByteOrderedPartitioner
 listen_address: 172.22.153.106
 storage_port: 6999
 rpc_port: 9160
