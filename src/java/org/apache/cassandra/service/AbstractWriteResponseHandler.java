@@ -111,15 +111,14 @@ public abstract class AbstractWriteResponseHandler<T> implements IAsyncCallbackW
     /*add*/
     public void getLongWait() throws WriteTimeoutException, WriteFailureException
     {
-        long requestTimeout = 1000000;
+		long requestTimeout = 10000;
 
-        long timeout = requestTimeout - (System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(start));
+		long timeout = TimeUnit.MILLISECONDS.toNanos(requestTimeout) - (System.nanoTime() - start);
 
-        boolean success;
-        try
-        {
-            success = condition.await(timeout, TimeUnit.MILLISECONDS);
-        }
+		boolean success;
+		try {
+			success = condition.await(timeout, TimeUnit.NANOSECONDS);
+		}
         catch (InterruptedException ex)
         {
             throw new AssertionError(ex);

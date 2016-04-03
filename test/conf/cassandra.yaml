@@ -11,11 +11,11 @@ commitlog_segment_size_in_mb: 5
 commitlog_directory: build/test/cassandra/commitlog
 hints_directory: build/test/cassandra/hints
 partitioner: org.apache.cassandra.dht.ByteOrderedPartitioner
-listen_address: 127.0.0.1
-storage_port: 7010
-rpc_port: 9170
+listen_address: 172.22.153.97
+storage_port: 6999
+rpc_port: 9160
 start_native_transport: true
-native_transport_port: 9042
+native_transport_port: 9043
 column_index_size_in_kb: 4
 saved_caches_directory: build/test/cassandra/saved_caches
 data_file_directories:
@@ -24,7 +24,7 @@ disk_access_mode: mmap
 seed_provider:
     - class_name: org.apache.cassandra.locator.SimpleSeedProvider
       parameters:
-          - seeds: "127.0.0.1"
+          - seeds: "172.22.153.97"
 endpoint_snitch: org.apache.cassandra.locator.SimpleSnitch
 dynamic_snitch: true
 request_scheduler: org.apache.cassandra.scheduler.RoundRobinScheduler
