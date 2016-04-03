@@ -26,6 +26,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.locks.*;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
@@ -38,9 +39,11 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.auth.*;
 import org.apache.cassandra.config.Config.CommitLogSync;
 import org.apache.cassandra.config.Config.RequestSchedulerId;
+import org.apache.cassandra.service.LockEntry;
 import org.apache.cassandra.config.EncryptionOptions.ClientEncryptionOptions;
 import org.apache.cassandra.config.EncryptionOptions.ServerEncryptionOptions;
 import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.SystemKeyspace;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.exceptions.ConfigurationException;
@@ -48,6 +51,7 @@ import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.sstable.format.SSTableFormat;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.locator.*;
+import org.apache.cassandra.net.MessageIn;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.scheduler.IRequestScheduler;
 import org.apache.cassandra.scheduler.NoScheduler;
@@ -58,9 +62,22 @@ import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.memory.*;
 import org.apache.commons.lang3.StringUtils;
 
+
 public class DatabaseDescriptor
 {
-    private static final Logger logger = LoggerFactory.getLogger(DatabaseDescriptor.class);
+    
+    public class messageTuple
+    {
+    	public MessageIn<Mutation> message;
+    	public int id;
+    }
+	
+    public static Lock glock = new ReentrantLock();
+    public static HashMap<Integer, LockEntry> lockmap = new HashMap<Integer, LockEntry>();
+    //public static Queue<messageTuple> msgQueue = new LinkedList<messageTuple>();
+    
+    
+	private static final Logger logger = LoggerFactory.getLogger(DatabaseDescriptor.class);
 
     /**
      * Tokens are serialized in a Gossip VersionedValue String.  VV are restricted to 64KB
@@ -2039,4 +2056,5 @@ public class DatabaseDescriptor
     {
         return Integer.valueOf(System.getProperty("cassandra.search_concurrency_factor", "1"));
     }
+
 }

@@ -25,6 +25,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.*;
+
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
@@ -44,6 +46,7 @@ import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
+import org.apache.cassandra.service.LockEntry;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.filter.DataLimits;
 import org.apache.cassandra.db.filter.TombstoneOverwhelmingException;
@@ -871,9 +874,62 @@ public class StorageProxy implements StorageProxyMBean
                                           boolean mutateAtomically)
     throws WriteTimeoutException, WriteFailureException, UnavailableException, OverloadedException, InvalidRequestException
     {
-        /*add*/
-        lock(mutations);
-        /*add*/
+    	//use the hash of the last token in mutations as key
+    	int key = 0;
+    	long timestamp = 0;
+    	for (IMutation imu : mutations)
+    	{
+    		if(imu instanceof Mutation ){
+    			timestamp = ((Mutation)imu).createdAt;
+    			key = imu.key().getToken().hashCode();
+    		}
+    	}
+    	    	
+        //global data kept in DatabaseDescriptor
+    	Lock glock = DatabaseDescriptor.glock;
+    	HashMap<Integer, LockEntry> lockmap = DatabaseDescriptor.lockmap;
+    	//Queue<messageTuple> msgQueue = DatabaseDescriptor.msgQueue;
+    	
+    	//local coordination: only one thread shall enter distributed-locking
+    	glock.lock();
+    	if ( !lockmap.containsKey(key) ){
+    		Lock tmpLock = new ReentrantLock();
+    		Condition tmpCond = tmpLock.newCondition();
+    		Condition blockCond = tmpLock.newCondition();
+    		lockmap.put(key,  new LockEntry(-1, tmpLock, tmpCond, blockCond, 0, 0));
+    	}
+    	LockEntry entry = lockmap.get(key);
+    	glock.unlock();
+    	
+    	entry.lock.lock();
+    	if( entry.state == -1 ){
+    		entry.state = 0;
+    		entry.in++;
+    		entry.timestamp = timestamp;
+    	} else {
+    		entry.out++;    		
+    		try{
+    			while(entry.in > 0)
+    				entry.cond.await();
+    			glock.lock();
+    			entry.in++;
+    			entry.out--;
+    			glock.unlock();
+    		} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+    	}	
+    	entry.lock.unlock();
+    	
+    	//distributed mutex lock
+    	/*add*/	 
+        lock(mutations);	//broadcast, wait for response
+        //update local from WANTED to HELD 
+        entry.lock.lock();
+        entry.state = 1;
+        entry.lock.unlock();
+        
+        //do transaction
         Collection<Mutation> augmented = TriggerExecutor.instance.execute(mutations);
 
         boolean updatesView = Keyspace.open(mutations.iterator().next().getKeyspaceName())
@@ -887,8 +943,21 @@ public class StorageProxy implements StorageProxyMBean
             if (mutateAtomically || updatesView)
                 mutateAtomically((Collection<Mutation>) mutations, consistencyLevel, updatesView);
             else
-                mutate(mutations, consistencyLevel);
+            	mutate(mutations, ConsistencyLevel.ALL);	//mutate(mutations, consistencyLevel);
         }
+        
+        //local check
+        entry.lock.lock();
+        entry.in--;				//this thread finished
+        if( entry.out != 0 ){
+        	entry.cond.signal();	//let other local thread transact
+        	entry.lock.unlock();
+        }else{
+        	entry.state = -1;
+        	entry.replyBlock.signalAll();
+        	entry.lock.unlock();
+        }
+        
     }
 
     /**

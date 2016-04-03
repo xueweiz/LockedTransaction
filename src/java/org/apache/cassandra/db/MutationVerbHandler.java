@@ -20,13 +20,19 @@ package org.apache.cassandra.db;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.HashMap;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import org.apache.cassandra.batchlog.LegacyBatchlogMigrator;
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.io.util.FastByteArrayInputStream;
 import org.apache.cassandra.net.*;
 import org.apache.cassandra.net.MessagingService.Verb;
+import org.apache.cassandra.service.LockEntry;
 import org.apache.cassandra.tracing.Tracing;
 
 public class MutationVerbHandler implements IVerbHandler<Mutation>
@@ -45,8 +51,69 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
 
     public void doVerbLock(MessageIn<Mutation> message, int id)  throws IOException
     {
-        replyLock(message, id);
+    	int key = message.payload.key().getToken().hashCode();
+    	long msgTimestamp = message.payload.createdAt;
+    	InetAddress msgaddr = message.from;
+    	int msgAddrHash = msgaddr.hashCode();
+    	
+    	//global data kept in DatabaseDescriptor
+    	Lock glock = DatabaseDescriptor.glock;
+    	HashMap<Integer, LockEntry> lockmap = DatabaseDescriptor.lockmap;
+    	
+    	//prepare hashmap
+    	glock.lock();
+    	if ( !lockmap.containsKey(key) ){
+    		Lock tmpLock = new ReentrantLock();
+    		Condition tmpCond = tmpLock.newCondition();
+    		Condition blockCond = tmpLock.newCondition();
+    		lockmap.put(key,  new LockEntry(-1, tmpLock, tmpCond, blockCond, 0, 0));
+    	}
+    	LockEntry entry = lockmap.get(key);
+    	glock.unlock();
+    	
+    	
+    	//block or reply?
+    	boolean blocked = false; 
+    	entry.lock.lock();
+    	long myTimestamp = entry.timestamp;
+		InetAddress myaddr = DatabaseDescriptor.getListenAddress();
+		int myAddrHash = myaddr.hashCode();
+    	if(entry.state == 1){
+    		entry.replyBufferSize++;
+    		blocked = true;
+    		try {
+				while(entry.state==1)
+					entry.replyBlock.await();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+    		entry.replyBufferSize--;
+    	}else if(entry.state == 0){
+    		
+    		
+    		if(myTimestamp < msgTimestamp || (myTimestamp==msgTimestamp && myAddrHash < msgAddrHash)){
+    			entry.replyBufferSize++;
+    			blocked = true;
+    			try{
+    				while(entry.state != -1)
+    					entry.replyBlock.await();
+    			} catch (InterruptedException e) {
+    				e.printStackTrace();
+    			}
+        		entry.replyBufferSize--;
+    		}
+    	}
+    	
+    	replyLock(message, id);
+    	entry.lock.unlock();
+    	
+    	glock.lock();
+    	if(entry.state == -1 && entry.in==0 && entry.out==0 && entry.replyBufferSize==0)
+    		lockmap.remove(key);
+    	glock.unlock();
     }
+    
+    
     
     public void replyLock(MessageIn<Mutation> message, int id)  throws IOException
     {
@@ -79,7 +146,9 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     
     public void doVerb(MessageIn<Mutation> message, int id)  throws IOException
     {
-        /*add*/
+        
+    	
+    	/*add*/
         if(message.verb==Verb.LOCK)
         {
             doVerbLock(message, id);

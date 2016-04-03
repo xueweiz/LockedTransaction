@@ -65,9 +65,25 @@ sudo iptables -F
 
 INSERT INTO emp (empID, deptID, first_name, last_name)
 VALUES (104, 15, 'jane', 'smith');
-
 INSERT INTO emp (empID, deptID, first_name, last_name)
 VALUES (104, 15, 'jane1', 'smith1');
+
+
+
+create keyspace mlgb1 with replication = {'class':'SimpleStrategy', 'replication_factor':1};
+describe keyspaces
+use mlgb;
+create table cnm (pid int primary key, name text, value int);
+insert into cnm (pid, name, value) values(13, 'xxx', 432);
+select * from cnm;
+update cnm set name = 'asdf' where pid = 15;
+
+
+key = 15
+key	923567	
+timestamp	1459715786943
+
+
 
 
 #ssh key gen
