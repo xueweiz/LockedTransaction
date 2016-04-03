@@ -1,17 +1,35 @@
+#run cassandra in front
+ps auwx | grep cassandra
+sudo kill -9 PID
+
+cd LockedTransaction
+git pull
+
+#first cluster
+cp ./conf/cassandra01.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra01.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra02.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra02.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra03.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra03.yaml  test/conf/cassandra.yaml
+#second cluster
+cp ./conf/cassandra04.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra04.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra05.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra05.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra06.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra06.yaml  test/conf/cassandra.yaml
+#third cluster
+cp ./conf/cassandra07.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra07.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra08.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra08.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra09.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra09.yaml  test/conf/cassandra.yaml
+cp ./conf/cassandra10.yaml ./conf/cassandra.yaml  &&  cp ./test/conf/cassandra10.yaml  test/conf/cassandra.yaml
+
+#run cassandra
+sudo rm -rf /var/lib/cassandra/* 
+rm -rf ./data && bin/cassandra -f
+
+#ssh ip
 ssh xzhan160@sp16-cs525-g38-01.cs.illinois.edu
-#ssh key gen
-ssh-keygen -t rsa
-cat ~/.ssh/id_rsa.pub
-#copy to github
-#install java and ant
-sudo yum install java-1.8.0-openjdk-devel
-sudo yum install ant
-#checkout from github
-git clone git@github.com:XueweiKent/LockedTransaction.git
 
 #compile
 cd LockedTransaction && ant build
 
+#ssh without password
 ssh-copy-id xzhan160@sp16-cs525-g38-01.cs.illinois.edu
 ssh-copy-id xzhan160@sp16-cs525-g38-02.cs.illinois.edu
 ssh-copy-id xzhan160@sp16-cs525-g38-03.cs.illinois.edu
@@ -22,15 +40,6 @@ ssh-copy-id xzhan160@sp16-cs525-g38-07.cs.illinois.edu
 ssh-copy-id xzhan160@sp16-cs525-g38-08.cs.illinois.edu
 ssh-copy-id xzhan160@sp16-cs525-g38-09.cs.illinois.edu
 ssh-copy-id xzhan160@sp16-cs525-g38-10.cs.illinois.edu
-
-
-#run multi-node cluster
-cd ~/LockedTransaction
-ps auwx | grep cassandra
-sudo kill -9 PID
-sudo rm -rf /var/lib/cassandra/*
-rm -rf ./data
-
 
 
 01-03
@@ -49,12 +58,8 @@ rm -rf ./data
 172.22.153.105
 172.22.153.106
 
-cp ./conf/cassandra07.yaml ./conf/cassandra.yaml
-cp ./conf/cassandra08.yaml ./conf/cassandra.yaml
-cp ./conf/cassandra09.yaml ./conf/cassandra.yaml
-cp ./conf/cassandra10.yaml ./conf/cassandra.yaml
 
-sudo rm -rf /var/lib/cassandra/* && rm -rf ./data && bin/cassandra -f
+#open netcat connections
 sudo iptables -F
 
 INSERT INTO emp (empID, deptID, first_name, last_name)
@@ -62,3 +67,14 @@ VALUES (104, 15, 'jane', 'smith');
 
 INSERT INTO emp (empID, deptID, first_name, last_name)
 VALUES (104, 15, 'jane1', 'smith1');
+
+
+#ssh key gen
+ssh-keygen -t rsa
+cat ~/.ssh/id_rsa.pub
+#copy to github
+#install java and ant
+sudo yum install java-1.8.0-openjdk-devel
+sudo yum install ant
+#checkout from github
+git clone git@github.com:XueweiKent/LockedTransaction.git
