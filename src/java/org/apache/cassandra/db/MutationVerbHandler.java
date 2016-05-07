@@ -62,6 +62,7 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     	
     	//prepare hashmap
     	glock.lock();
+    	System.out.println("Asdsadsafs");
     	if ( !lockmap.containsKey(key) ){
     		Lock tmpLock = new ReentrantLock();
     		Condition tmpCond = tmpLock.newCondition();
