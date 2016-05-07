@@ -52,7 +52,7 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     public void doVerbLock(MessageIn<Mutation> message, int id)  throws IOException
     {
     	int key = message.payload.key().getToken().hashCode();
-    	long msgTimestamp = message.payload.createdAt;
+    	long msgTimestamp = message.payload.mTimestamp;
     	InetAddress msgaddr = message.from;
     	int msgAddrHash = msgaddr.hashCode();
     	

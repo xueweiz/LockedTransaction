@@ -880,7 +880,7 @@ public class StorageProxy implements StorageProxyMBean
     	for (IMutation imu : mutations)
     	{
     		if(imu instanceof Mutation ){
-    			timestamp = ((Mutation)imu).createdAt;
+    			timestamp = ((Mutation)imu).mTimestamp;
     			key = imu.key().getToken().hashCode();
     		}
     	}
