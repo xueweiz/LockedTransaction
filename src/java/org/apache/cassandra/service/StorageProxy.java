@@ -884,6 +884,8 @@ public class StorageProxy implements StorageProxyMBean
     			key = imu.key().getToken().hashCode();
     		}
     	}
+    	System.out.println("key: "+key+" Time: "+timestamp);
+    	
     	    	
         //global data kept in DatabaseDescriptor
     	Lock glock = DatabaseDescriptor.glock;
@@ -891,7 +893,9 @@ public class StorageProxy implements StorageProxyMBean
     	//Queue<messageTuple> msgQueue = DatabaseDescriptor.msgQueue;
     	
     	//local coordination: only one thread shall enter distributed-locking
+    	System.out.println("GLOCK2");
     	glock.lock();
+    	System.out.println("GLOCK2fin");
     	if ( !lockmap.containsKey(key) ){
     		Lock tmpLock = new ReentrantLock();
     		Condition tmpCond = tmpLock.newCondition();
@@ -900,14 +904,15 @@ public class StorageProxy implements StorageProxyMBean
     	}
     	LockEntry entry = lockmap.get(key);
     	glock.unlock();
-    	
+    	System.out.println("GUNLOCK2");
     	entry.lock.lock();
     	if( entry.state == -1 ){
     		entry.state = 0;
     		entry.in++;
     		entry.timestamp = timestamp;
     	} else {
-    		entry.out++;    		
+    		entry.out++;    
+    		System.out.println("AWAIT2");
     		try{
     			while(entry.in > 0)
     				entry.cond.await();
@@ -918,14 +923,20 @@ public class StorageProxy implements StorageProxyMBean
     		} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+    		System.out.println("AWAITFIN2");
     	}	
     	entry.lock.unlock();
     	
     	//distributed mutex lock
     	/*add*/	 
+    	System.out.println("ENTER LOCK MUTATION");
         lock(mutations);	//broadcast, wait for response
         //update local from WANTED to HELD 
+        System.out.println("LEAVE LOCK MUTATION");
+        System.out.println("ENTRY LOCK 2");
+        
         entry.lock.lock();
+        System.out.println("ENTRY LOCK 2 FIN");
         entry.state = 1;
         entry.lock.unlock();
         
@@ -947,16 +958,21 @@ public class StorageProxy implements StorageProxyMBean
         }
         
         //local check
+        System.out.println("ENTRY LOCK 3");
         entry.lock.lock();
+        System.out.println("ENTRY LOCK 3 FIN");
         entry.in--;				//this thread finished
         if( entry.out != 0 ){
+            System.out.println("SINAL");
         	entry.cond.signal();	//let other local thread transact
         	entry.lock.unlock();
         }else{
         	entry.state = -1;
+        	System.out.println("SIGNALALL");
         	entry.replyBlock.signalAll();
         	entry.lock.unlock();
         }
+        System.out.println("LEAVE FUNCTION");
         
     }
 
