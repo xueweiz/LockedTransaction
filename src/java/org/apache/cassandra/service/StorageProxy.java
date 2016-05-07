@@ -915,7 +915,11 @@ public class StorageProxy implements StorageProxyMBean
     		System.out.println("AWAIT2");
     		try{
     			while(entry.in > 0)
-    				entry.cond.await();
+    			{
+    			    System.out.println("IN: "+entry.in);
+    			    entry.cond.await();
+    			    
+    			}
     			System.out.println("WAKENKENEKNE");
     			//glock.lock();
     			entry.in++;
