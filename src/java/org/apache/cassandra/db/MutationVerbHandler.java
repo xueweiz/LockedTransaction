@@ -109,6 +109,13 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     	}else if(entry.state == 0){
     		
     		
+    	    System.out.println("myTimestamp: "+myTimestamp);
+    	    System.out.println("msgTimestamp: "+msgTimestamp);
+    	    System.out.println("myAddrHash: "+myAddrHash);
+    	    System.out.println("msgAddrHash: "+msgAddrHash);
+    	    
+    	    
+    	    
     		if(myTimestamp < msgTimestamp || (myTimestamp==msgTimestamp && myAddrHash < msgAddrHash)){
     			entry.replyBufferSize++;
     			blocked = true;
@@ -116,7 +123,10 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
 
     			try{
     				while(entry.state != -1)
+    				{
+    				    System.out.println("entry state " + entry.state);
     					entry.replyBlock.await();
+    				}
     			} catch (InterruptedException e) {
     				e.printStackTrace();
     			}
