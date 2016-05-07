@@ -61,8 +61,11 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     	HashMap<Integer, LockEntry> lockmap = DatabaseDescriptor.lockmap;
     	
     	//prepare hashmap
+        System.out.println("GLOCK1");
+
     	glock.lock();
-    	System.out.println("Asdsadsafs");
+        System.out.println("GLOCK1FIN");
+    	
     	if ( !lockmap.containsKey(key) ){
     		Lock tmpLock = new ReentrantLock();
     		Condition tmpCond = tmpLock.newCondition();
@@ -71,16 +74,28 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     	}
     	LockEntry entry = lockmap.get(key);
     	glock.unlock();
-    	
+        System.out.println("GUNLOCK1");
+
     	
     	//block or reply?
     	boolean blocked = false; 
+        System.out.println("ENTRYLOCK1");
+
     	entry.lock.lock();
+        System.out.println("ENTRYLOCK1FIN");
+
     	long myTimestamp = entry.timestamp;
+        System.out.println("time: "+myTimestamp);
+
 		InetAddress myaddr = DatabaseDescriptor.getListenAddress();
+        System.out.println("addr: "+myaddr);
+
 		int myAddrHash = myaddr.hashCode();
     	if(entry.state == 1){
     		entry.replyBufferSize++;
+            System.out.println("buffersize: "+entry.replyBufferSize);
+
+    		
     		blocked = true;
     		try {
 				while(entry.state==1)
@@ -88,6 +103,8 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+            System.out.println("WAKEN1");
+
     		entry.replyBufferSize--;
     	}else if(entry.state == 0){
     		
@@ -95,23 +112,29 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     		if(myTimestamp < msgTimestamp || (myTimestamp==msgTimestamp && myAddrHash < msgAddrHash)){
     			entry.replyBufferSize++;
     			blocked = true;
+    	        System.out.println("WAIT2");
+
     			try{
     				while(entry.state != -1)
     					entry.replyBlock.await();
     			} catch (InterruptedException e) {
     				e.printStackTrace();
     			}
+    	        System.out.println("WAKEN2");
+
         		entry.replyBufferSize--;
     		}
     	}
-    	
-    	replyLock(message, id);
+        System.out.println("ENTER REPLYLOCK");
+        replyLock(message, id);
+        System.out.println("LEAVE REPLYLOCK");
+
     	entry.lock.unlock();
-    	
-    	glock.lock();
-    	if(entry.state == -1 && entry.in==0 && entry.out==0 && entry.replyBufferSize==0)
-    		lockmap.remove(key);
-    	glock.unlock();
+
+//    	glock.lock();
+//    	if(entry.state == -1 && entry.in==0 && entry.out==0 && entry.replyBufferSize==0)
+//  		lockmap.remove(key);
+//    	glock.unlock();
     }
     
     
