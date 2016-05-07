@@ -343,7 +343,13 @@ public class Mutation implements IMutation
 
             PartitionUpdate update = PartitionUpdate.serializer.deserialize(in, version, flag, key);
             if (size == 1)
-                return new Mutation(update);
+            {
+                Mutation temp = new Mutation(update);
+                System.out.println("tempTimeSteap: "+tempTimestamp);
+
+                temp.mTimestamp = tempTimestamp;
+                return temp;
+            }
 
             Map<UUID, PartitionUpdate> modifications = new HashMap<>(size);
             DecoratedKey dk = update.partitionKey();
