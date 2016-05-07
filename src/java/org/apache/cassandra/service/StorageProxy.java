@@ -916,10 +916,10 @@ public class StorageProxy implements StorageProxyMBean
     		try{
     			while(entry.in > 0)
     				entry.cond.await();
-    			glock.lock();
+    			//glock.lock();
     			entry.in++;
     			entry.out--;
-    			glock.unlock();
+    			//glock.unlock();
     		} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
