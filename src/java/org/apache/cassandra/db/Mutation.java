@@ -297,7 +297,7 @@ public class Mutation implements IMutation
         public void serialize(Mutation mutation, DataOutputPlus out, int version) throws IOException
         {
             
-            
+            out.writeLong(mutation.mTimestamp);
             if (version < MessagingService.VERSION_20)
                 out.writeUTF(mutation.getKeyspaceName());
 
@@ -313,7 +313,7 @@ public class Mutation implements IMutation
             {
                 out.writeUnsignedVInt(size);
             }
-            out.writeLong(mutation.mTimestamp);
+            
             assert size > 0;
             for (Map.Entry<UUID, PartitionUpdate> entry : mutation.modifications.entrySet())
                 PartitionUpdate.serializer.serialize(entry.getValue(), out, version);
@@ -321,6 +321,8 @@ public class Mutation implements IMutation
 
         public Mutation deserialize(DataInputPlus in, int version, SerializationHelper.Flag flag) throws IOException
         {
+            
+            long tempTimestamp = (long)in.readLong();
             if (version < MessagingService.VERSION_20)
                 in.readUTF(); // read pre-2.0 keyspace name
 
@@ -335,7 +337,7 @@ public class Mutation implements IMutation
             {
                 size = (int)in.readUnsignedVInt();
             }
-            long tempTimestamp = (long)in.readLong();
+            
             assert size > 0;
 
             PartitionUpdate update = PartitionUpdate.serializer.deserialize(in, version, flag, key);
@@ -382,7 +384,7 @@ public class Mutation implements IMutation
             for (Map.Entry<UUID, PartitionUpdate> entry : mutation.modifications.entrySet())
                 size += PartitionUpdate.serializer.serializedSize(entry.getValue(), version);
 
-            return size;
+            return size+8;
         }
     }
 }
