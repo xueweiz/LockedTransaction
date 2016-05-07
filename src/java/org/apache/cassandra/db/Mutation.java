@@ -57,15 +57,15 @@ public class Mutation implements IMutation
     private final Map<UUID, PartitionUpdate> modifications;
 
     // Time at which this mutation was instantiated
-    public final long createdAt = myGetTime();
-    public long mTimestamp = System.currentTimeMillis();
+    public final long createdAt = System.currentTimeMillis();
+    public long mTimestamp = myGetTime();
     // keep track of when mutation has started waiting for a MV partition lock
     public final AtomicLong viewLockAcquireStart = new AtomicLong(0);
 
     public long myGetTime()
     {
         long temp = System.currentTimeMillis();
-        //System.out.println("create mutation at " + temp);
+        System.out.println("create mutation at " + temp);
         return temp;
     }
     
