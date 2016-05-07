@@ -905,11 +905,16 @@ public class StorageProxy implements StorageProxyMBean
     	LockEntry entry = lockmap.get(key);
     	glock.unlock();
     	System.out.println("GUNLOCK2");
+    	
     	entry.lock.lock();
     	if( entry.state == -1 ){
     		entry.state = 0;
     		entry.in++;
     		entry.timestamp = timestamp;
+    		entry.lock.unlock();
+    		System.out.println("ENTER LOCK MUTATION");
+            //if(entry.state)
+            lock(mutations);    //broadcast, wait for response
     	} else {
     		entry.out++;    
     		System.out.println("AWAIT2");
@@ -929,13 +934,13 @@ public class StorageProxy implements StorageProxyMBean
 				e.printStackTrace();
 			}
     		System.out.println("AWAITFIN2");
+    		entry.lock.unlock();
     	}	
-    	entry.lock.unlock();
+    	
     	
     	//distributed mutex lock
     	/*add*/	 
-    	System.out.println("ENTER LOCK MUTATION");
-        lock(mutations);	//broadcast, wait for response
+    	
         //update local from WANTED to HELD 
         System.out.println("LEAVE LOCK MUTATION");
         System.out.println("ENTRY LOCK 2");

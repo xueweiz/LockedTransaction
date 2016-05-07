@@ -298,6 +298,7 @@ public class Mutation implements IMutation
         {
             
             out.writeLong(mutation.mTimestamp);
+            System.out.println("write time: "+mutation.mTimestamp);
             if (version < MessagingService.VERSION_20)
                 out.writeUTF(mutation.getKeyspaceName());
 
@@ -354,6 +355,7 @@ public class Mutation implements IMutation
                 modifications.put(update.metadata().cfId, update);
             }
             Mutation temp = new Mutation(update.metadata().ksName, dk, modifications);
+            System.out.println("tempTimeSteap: "+tempTimestamp);
             temp.mTimestamp = tempTimestamp;
             return temp;
         }
