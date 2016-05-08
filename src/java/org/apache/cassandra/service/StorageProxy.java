@@ -914,26 +914,35 @@ public class StorageProxy implements StorageProxyMBean
     		entry.lock.unlock();
     		System.out.println("ENTER LOCK MUTATION");
             //if(entry.state)
-    		int lockFlag = 1;
-    		while(lockFlag == 1)
-    		{
-    		    lockFlag = 0;
-        		try
-        		{
-        		    lock(mutations);    //broadcast, wait for response
+    		try
+        	{
+    		    lock(mutations);    //broadcast, wait for response
         		    
-        		    entry.lock.lock();
-        	        System.out.println("ENTRY LOCK 2 FIN");
-        	        entry.state = 1;
-        	        entry.lock.unlock();
-        	        
-        		}
-        		catch (Exception e)
-        		{
-        		    System.out.println("catch timeout exception");
-        		    lockFlag = 1;
-        		}
-    		}
+        	    entry.lock.lock();
+                System.out.println("ENTRY LOCK 2 FIN");
+       	        entry.state = 1;
+       	        entry.lock.unlock();   
+       		}
+       		catch (Exception e)
+       		{
+       		     System.out.println("catch timeout exception"); 
+           		 System.out.println("ENTRY LOCK 3");
+                 entry.lock.lock();
+                 System.out.println("ENTRY LOCK 3 FIN");
+                 entry.in--;             //this thread finished
+                 if( entry.out != 0 ){
+                     System.out.println("cond SINAL");
+                     entry.cond.signal();    //let other local thread transact
+                     entry.lock.unlock();
+                 }else{
+                     entry.state = -1;
+                     System.out.println("replyBlock SIGNALALL");
+                     entry.replyBlock.signalAll();
+                     entry.lock.unlock();
+                 }
+       		     throw e;
+        	}
+    		
     	} else {
     		entry.out++;    
     		System.out.println("AWAIT2");
@@ -942,18 +951,46 @@ public class StorageProxy implements StorageProxyMBean
     			{
     			    System.out.println("IN: "+entry.in);
     			    entry.cond.await();
-    			    
     			}
     			System.out.println("WAKENKENEKNE");
-    			//glock.lock();
     			entry.in++;
     			entry.out--;
-    			//glock.unlock();
     		} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
     		System.out.println("AWAITFIN2");
-    		entry.lock.unlock();
+    		
+    		if (entry.state == 0) {
+                entry.timestamp = timestamp;
+                entry.lock.unlock();
+                try
+                {
+                    lock(mutations);    //broadcast, wait for response
+                        
+                    entry.lock.lock();
+                    entry.state = 1;
+                    entry.lock.unlock();   
+                }
+                catch (Exception e)
+                {
+                     entry.lock.lock();
+                     entry.in--;             //this thread finished
+                     if( entry.out != 0 ){
+                         System.out.println("cond SINAL");
+                         entry.cond.signal();    //let other local thread transact
+                         entry.lock.unlock();
+                     }else{
+                         entry.state = -1;
+                         System.out.println("replyBlock SIGNALALL");
+                         entry.replyBlock.signalAll();
+                         entry.lock.unlock();
+                     }
+                     throw e;
+                }
+    		}else{
+    		    entry.lock.unlock();
+    		}
+    		
     	}	
     	
     	
