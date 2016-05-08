@@ -914,28 +914,25 @@ public class StorageProxy implements StorageProxyMBean
     		entry.lock.unlock();
     		System.out.println("ENTER LOCK MUTATION");
             //if(entry.state)
-    		try
+    		int lockFlag = 1;
+    		while(lockFlag == 1)
     		{
-    		    lock(mutations);    //broadcast, wait for response
-    		}
-    		catch (Exception e)
-    		{
-    		    System.out.println("ENTRY LOCK 3");
-    	        entry.lock.lock();
-    	        System.out.println("ENTRY LOCK 3 FIN");
-    	        entry.in--;             //this thread finished
-    	        if( entry.out != 0 ){
-    	            System.out.println("SINAL");
-    	            entry.cond.signal();    //let other local thread transact
-    	            entry.lock.unlock();
-    	        }else{
-    	            entry.state = -1;
-    	            System.out.println("SIGNALALL");
-    	            entry.replyBlock.signalAll();
-    	            entry.lock.unlock();
-    	        }
-    	        System.out.println("LEAVE FUNCTION");
-    	        throw e;
+    		    lockFlag = 0;
+        		try
+        		{
+        		    lock(mutations);    //broadcast, wait for response
+        		    
+        		    entry.lock.lock();
+        	        System.out.println("ENTRY LOCK 2 FIN");
+        	        entry.state = 1;
+        	        entry.lock.unlock();
+        	        
+        		}
+        		catch (Exception e)
+        		{
+        		    System.out.println("catch timeout exception");
+        		    lockFlag = 1;
+        		}
     		}
     	} else {
     		entry.out++;    
@@ -967,10 +964,7 @@ public class StorageProxy implements StorageProxyMBean
         System.out.println("LEAVE LOCK MUTATION");
         System.out.println("ENTRY LOCK 2");
         
-        entry.lock.lock();
-        System.out.println("ENTRY LOCK 2 FIN");
-        entry.state = 1;
-        entry.lock.unlock();
+        
         
         //do transaction
         Collection<Mutation> augmented = TriggerExecutor.instance.execute(mutations);
