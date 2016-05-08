@@ -914,7 +914,29 @@ public class StorageProxy implements StorageProxyMBean
     		entry.lock.unlock();
     		System.out.println("ENTER LOCK MUTATION");
             //if(entry.state)
-            lock(mutations);    //broadcast, wait for response
+    		try
+    		{
+    		    lock(mutations);    //broadcast, wait for response
+    		}
+    		catch (Exception e)
+    		{
+    		    System.out.println("ENTRY LOCK 3");
+    	        entry.lock.lock();
+    	        System.out.println("ENTRY LOCK 3 FIN");
+    	        entry.in--;             //this thread finished
+    	        if( entry.out != 0 ){
+    	            System.out.println("SINAL");
+    	            entry.cond.signal();    //let other local thread transact
+    	            entry.lock.unlock();
+    	        }else{
+    	            entry.state = -1;
+    	            System.out.println("SIGNALALL");
+    	            entry.replyBlock.signalAll();
+    	            entry.lock.unlock();
+    	        }
+    	        System.out.println("LEAVE FUNCTION");
+    	        throw e;
+    		}
     	} else {
     		entry.out++;    
     		System.out.println("AWAIT2");
